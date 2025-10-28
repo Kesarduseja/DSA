@@ -1,0 +1,321 @@
+import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+// --- Custom Contact Class (Unchanged) ---
+class Contact {
+    private String name;
+    private String phoneNumber;
+
+    public Contact(String name, String phoneNumber) {
+        this.name = name;
+        this.phoneNumber = phoneNumber;
+    }
+    public String getName() { return name; }
+    public String getPhoneNumber() { return phoneNumber; }
+    public Object[] toArray() { return new Object[]{name, phoneNumber}; }
+
+    // Overriding equals and hashCode to correctly identify a Contact object
+    // which is necessary if we were to delete based on the object reference,
+    // though here we use the displayed name/phone for simplicity.
+    // For this app's current logic, the toArray() contents are enough for search/display.
+}
+
+// -------------------------------------------------------------------
+// --- NEW DSA/UI COMPONENT: Custom TableCellRenderer for Zebra Striping ---
+// -------------------------------------------------------------------
+class ZebraTableRenderer extends DefaultTableCellRenderer {
+    // Custom colors for the zebra pattern
+    private static final Color SKY_BLUE = new Color(158, 142, 142, 255); // Light Sky Blue
+    private static final Color BLACK = Color.BLACK;
+    private static final Color SELECTION_COLOR = new Color(151, 128, 128); // Highlight on selection (Dark Gray)
+
+    @Override
+    public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+        // 1. Get the default renderer component (label)
+        Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+
+        // 2. Set the background color based on row index for zebra pattern
+        if (!isSelected) {
+            // Alternating pattern: Even rows (0, 2, 4...) get SKY_BLUE, Odd rows (1, 3, 5...) get WHITE.
+            if (row % 2 == 0) {
+                c.setBackground(SKY_BLUE);
+            } else {
+                c.setBackground(Color.BLACK);
+            }
+        } else {
+            // Keep a distinct color for the selected row
+            c.setBackground(SELECTION_COLOR);
+            c.setForeground(Color.BLACK); // White text for visibility on dark selection
+        }
+
+        // 3. Keep text color black for all non-selected cells
+        if (!isSelected) {
+            c.setForeground(Color.WHITE);
+        }
+
+        return c;
+    }
+}
+
+
+// --- Main Application Class (Modified) ---
+public class PhoneBookApp extends JFrame {
+
+    // --- COLOR PALETTE (Adjusted for better contrast with the table) ---
+    private static final Color PRIMARY_COLOR = new Color(15, 18, 25);     // Deep Azure Blue
+    private static final Color SECONDARY_COLOR = new Color(179, 88, 88);  // Off-White background
+    private static final Color ACCENT_COLOR = new Color(173, 81, 186);       // Orange/Amber for Action Buttons
+    private static final Color DELETE_COLOR = new Color(200, 50, 50);       // Red for Delete Action
+
+    // --- FONT STYLES (Unchanged) ---
+    private static final Font LABEL_FONT = new Font("Segoe UI", Font.PLAIN, 14);
+    private static final Font BUTTON_FONT = new Font("Segoe UI", Font.BOLD, 14);
+    private static final Font TABLE_HEADER_FONT = new Font("Segoe UI", Font.BOLD, 14);
+
+    private List<Contact> contactList;
+    private DefaultTableModel tableModel;
+    private JTable contactTable;
+
+    private JTextField nameField, phoneField, searchField;
+    private JButton addButton, searchButton, showAllButton, deleteButton; // ADDED deleteButton
+
+    public PhoneBookApp() {
+        try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception ignored) {}
+
+        contactList = new ArrayList<>();
+        setTitle("Modern Phone Book (Zebra UI)");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLayout(new BorderLayout(15, 15));
+        getContentPane().setBackground(SECONDARY_COLOR);
+
+        // --- 1. Top Panel for Adding Contacts (GridBagLayout for clean stacking) ---
+        JPanel addPanel = new JPanel(new GridBagLayout());
+        addPanel.setBackground(PRIMARY_COLOR);
+        addPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 10, 5, 10);
+
+        // Name Field
+        nameField = new JTextField(15);
+        styleInput(nameField);
+        gbc.gridx = 0; gbc.gridy = 0; gbc.anchor = GridBagConstraints.EAST;
+        addPanel.add(styleLabel(new JLabel("Name:")), gbc);
+        gbc.gridx = 1; gbc.anchor = GridBagConstraints.WEST; gbc.fill = GridBagConstraints.HORIZONTAL;
+        addPanel.add(nameField, gbc);
+
+        // Phone Field
+        phoneField = new JTextField(15);
+        styleInput(phoneField);
+        gbc.gridx = 2; gbc.gridy = 0; gbc.anchor = GridBagConstraints.EAST; gbc.fill = GridBagConstraints.NONE;
+        addPanel.add(styleLabel(new JLabel("Phone:")), gbc);
+        gbc.gridx = 3; gbc.anchor = GridBagConstraints.WEST; gbc.fill = GridBagConstraints.HORIZONTAL;
+        addPanel.add(phoneField, gbc);
+
+        // Add Button
+        addButton = new JButton("Add Contact");
+        styleButton(addButton, ACCENT_COLOR);
+        gbc.gridx = 4; gbc.gridy = 0; gbc.anchor = GridBagConstraints.WEST; gbc.fill = GridBagConstraints.NONE;
+        addPanel.add(addButton, gbc);
+
+        // --- 2. Center Panel for Display (JTable and Delete Button) ---
+        String[] columnNames = {"Name", "Phone Number"};
+        tableModel = new DefaultTableModel(columnNames, 0);
+        contactTable = new JTable(tableModel);
+
+        // APPLY THE ZEBRA RENDERER
+        ZebraTableRenderer renderer = new ZebraTableRenderer();
+        contactTable.setDefaultRenderer(Object.class, renderer);
+        styleTable(contactTable);
+
+        JScrollPane scrollPane = new JScrollPane(contactTable);
+        scrollPane.setBorder(BorderFactory.createLineBorder(PRIMARY_COLOR.darker(), 1));
+
+        // Center Panel container (BorderLayout)
+        JPanel centerPanel = new JPanel(new BorderLayout());
+        centerPanel.add(scrollPane, BorderLayout.CENTER);
+
+        // ADDED: Panel for the Delete button
+        JPanel deleteButtonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 20, 10)); // FlowLayout for bottom right
+        deleteButtonPanel.setBackground(SECONDARY_COLOR);
+
+        deleteButton = new JButton("Delete Selected Contact");
+        styleButton(deleteButton, DELETE_COLOR); // Use the red delete color
+        deleteButtonPanel.add(deleteButton);
+
+        centerPanel.add(deleteButtonPanel, BorderLayout.SOUTH); // Add delete button panel to the bottom of center area
+
+        // --- 3. Bottom Panel for Search (Unchanged) ---
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 10));
+        searchPanel.setBackground(SECONDARY_COLOR);
+
+        searchField = new JTextField(20);
+        searchField.setFont(LABEL_FONT);
+        searchField.setBackground(Color.WHITE);
+
+        searchButton = new JButton("Search");
+        styleButton(searchButton, PRIMARY_COLOR);
+
+        showAllButton = new JButton("Show All");
+        styleButton(showAllButton, PRIMARY_COLOR);
+
+        JLabel searchLabel = new JLabel("Search (Name/Number):");
+        searchLabel.setFont(LABEL_FONT);
+
+        searchPanel.add(searchLabel);
+        searchPanel.add(searchField);
+        searchPanel.add(searchButton);
+        searchPanel.add(showAllButton);
+
+        // Add panels to the frame
+        add(addPanel, BorderLayout.NORTH);
+        add(centerPanel, BorderLayout.CENTER); // Use the new centerPanel
+        add(searchPanel, BorderLayout.SOUTH);
+
+        // Action Listeners
+        addButton.addActionListener(e -> addContact());
+        searchButton.addActionListener(e -> searchContacts());
+        showAllButton.addActionListener(e -> displayContacts(contactList));
+        deleteButton.addActionListener(e -> deleteContact()); // ADDED DELETE LISTENER
+
+        // Initial contacts
+        contactList.add(new Contact("Alice Smith", "123-456-7890"));
+        contactList.add(new Contact("Bob Johnson", "987-654-3210"));
+        contactList.add(new Contact("Charlie Brown", "555-123-4567"));
+        contactList.add(new Contact("Diana Prince", "555-987-6543"));
+        displayContacts(contactList);
+
+        // Final frame setup
+        setSize(800, 600); // Increased height slightly to accommodate the delete button panel
+        setLocationRelativeTo(null);
+        setVisible(true);
+    }
+
+    // --- Styling Helper Methods (Slightly adjusted) ---
+
+    private void styleInput(JTextField field) {
+        field.setFont(LABEL_FONT);
+        field.setBackground(Color.WHITE);
+    }
+
+    private JLabel styleLabel(JLabel label) {
+        label.setFont(LABEL_FONT);
+        label.setForeground(Color.WHITE);
+        return label;
+    }
+
+    private void styleButton(JButton button, Color bgColor) {
+        button.setFont(BUTTON_FONT);
+        button.setBackground(bgColor);
+        button.setForeground(Color.BLACK);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createEmptyBorder(8, 15, 8, 15));
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+    }
+
+    private void styleTable(JTable table) {
+        table.setFont(LABEL_FONT);
+        table.setRowHeight(25);
+        table.setShowGrid(false);
+        table.setIntercellSpacing(new Dimension(0, 0));
+
+        table.getTableHeader().setFont(TABLE_HEADER_FONT);
+        table.getTableHeader().setBackground(PRIMARY_COLOR);
+        table.getTableHeader().setForeground(Color.BLACK);
+        table.getTableHeader().setReorderingAllowed(false);
+    }
+
+    // --- Core Logic (DSA Operations - ADDED deleteContact) ---
+
+    private void addContact() {
+        String name = nameField.getText().trim();
+        String phone = phoneField.getText().trim();
+        if (name.isEmpty() || phone.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Fields cannot be empty.", "Input Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        Contact newContact = new Contact(name, phone);
+        contactList.add(newContact);
+        nameField.setText("");
+        phoneField.setText("");
+        displayContacts(contactList);
+        JOptionPane.showMessageDialog(this, "Contact added!", "Success", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void deleteContact() {
+        // 1. Get the index of the selected row in the JTable's view (which might be filtered/sorted)
+        int selectedViewRow = contactTable.getSelectedRow();
+
+        if (selectedViewRow == -1) {
+            JOptionPane.showMessageDialog(this, "Please select a contact to delete.", "Deletion Error", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // 2. Convert the view row index to the model row index (important for correct data retrieval)
+        int selectedModelRow = contactTable.convertRowIndexToModel(selectedViewRow);
+
+        // 3. Extract the contact details from the table model
+        String name = (String) tableModel.getValueAt(selectedModelRow, 0);
+        String phone = (String) tableModel.getValueAt(selectedModelRow, 1);
+
+        // 4. Confirm deletion with the user
+        int confirmation = JOptionPane.showConfirmDialog(this,
+                "Are you sure you want to delete the contact: \nName: " + name + "\nPhone: " + phone + "?",
+                "Confirm Deletion",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE);
+
+        if (confirmation == JOptionPane.YES_OPTION) {
+            // 5. Remove the contact from the main contactList
+            // The table may be displaying search results, so we must remove from the master list.
+            boolean removed = contactList.removeIf(contact ->
+                    contact.getName().equals(name) && contact.getPhoneNumber().equals(phone));
+
+            if (removed) {
+                // 6. Update the display to reflect the change in the table
+                // Since we don't know if the current view is a search result or the full list,
+                // the safest way is to re-run the search or display the full list based on the search field.
+                if (searchField.getText().trim().isEmpty()) {
+                    displayContacts(contactList); // Show all remaining contacts
+                } else {
+                    searchContacts(); // Re-run the search to update the filtered list
+                }
+                JOptionPane.showMessageDialog(this, "Contact deleted successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this, "Error: Could not find contact in the list.", "Deletion Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+
+    private void searchContacts() {
+        String keyword = searchField.getText().trim().toLowerCase();
+        if (keyword.isEmpty()) { displayContacts(contactList); return; }
+
+        List<Contact> searchResults = contactList.stream()
+                .filter(contact -> contact.getName().toLowerCase().contains(keyword) ||
+                        contact.getPhoneNumber().contains(keyword))
+                .collect(Collectors.toList());
+
+        if (searchResults.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No contacts found.", "Search Result", JOptionPane.INFORMATION_MESSAGE);
+        }
+
+        displayContacts(searchResults);
+    }
+
+    private void displayContacts(List<Contact> contacts) {
+        tableModel.setRowCount(0);
+        for (Contact contact : contacts) {
+            tableModel.addRow(contact.toArray());
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new PhoneBookApp());
+    }
+}
